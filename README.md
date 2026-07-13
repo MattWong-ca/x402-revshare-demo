@@ -1,7 +1,7 @@
 > **NOTE: This is for demo purposes only and should not be used in production.**
 
 # x402 Revshare Demo
-<img width="2816" height="1536" alt="final" src="https://github.com/user-attachments/assets/5257a5ab-52fe-437a-8617-0628e40431b3" />
+https://github.com/user-attachments/assets/c8df7276-e554-4b72-bd3f-d2eaaad9a843
 
 
 A few weeks ago we introduced [x402 Builder Codes](https://x.com/buildonbase/status/2069102951960904137), which unlocked onchain attribution for x402 payments. When an agent, framework, or app routes a paid x402 request, the builder's code (`s`) gets embedded in the settlement transaction onchain via an ERC-8021 suffix alongside the seller code (`a`) and facilitator code (`w`). 
