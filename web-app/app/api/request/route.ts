@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { wrapFetchWithPayment } from "@x402/fetch"
+import { wrapFetchWithPayment, decodePaymentResponseHeader } from "@x402/fetch"
 import { x402Client } from "@x402/core/client"
 import { ExactEvmScheme } from "@x402/evm/exact/client"
 import { BuilderCodeClientExtension } from "@x402/extensions/builder-code"
 import { privateKeyToAccount } from "viem/accounts"
-import { createWalletClient, http } from "viem"
-import { baseSepolia } from "viem/chains"
 import { getSeller } from "@/lib/sellers"
 
 const BUYER_BUILDER_CODE = process.env.BUYER_BUILDER_CODE || "demo_buyer"
@@ -25,13 +23,10 @@ export async function POST(request: NextRequest) {
   }
 
   const account = privateKeyToAccount(`0x${privateKey.replace(/^0x/, "")}`)
-  const walletClient = createWalletClient({
-    account,
-    chain: baseSepolia,
-    transport: http(process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org"),
-  })
 
-  const evmScheme = new ExactEvmScheme(walletClient as never)
+  // ExactEvmScheme's base flow needs a signer with `address` + `signTypedData`;
+  // a wallet client keeps its address at `.account.address`, which the scheme can't see
+  const evmScheme = new ExactEvmScheme(account)
   const client = new x402Client().register(NETWORK, evmScheme)
 
   // Register builder code extension so `s` is included in payment payload
@@ -48,10 +43,28 @@ export async function POST(request: NextRequest) {
     const response = await fetchWithPayment(sellerUrl)
     const data = await response.json()
 
+    // The facilitator's settlement result rides back on the PAYMENT-RESPONSE header
+    let settlement = null
+    const settleHeader =
+      response.headers.get("payment-response") || response.headers.get("x-payment-response")
+    if (settleHeader) {
+      try {
+        const settle = decodePaymentResponseHeader(settleHeader)
+        settlement = {
+          txHash: settle.transaction,
+          network: settle.network,
+          payer: settle.payer,
+        }
+      } catch (err) {
+        console.error("Failed to decode payment response header:", err)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       builderCode: BUYER_BUILDER_CODE,
       buyerAddress: account.address,
+      settlement,
       ...data,
     })
   } catch (err) {
